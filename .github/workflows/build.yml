@@ -1,0 +1,47 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Create Android project
+        run: |
+          mkdir build && cd build
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android three@0.160.0 cannon-es@0.20.0
+          npx cap init "GORE FLIP" com.example.goreflip --web-dir=www
+          mkdir www
+          cp ../index.html www/index.html
+          mkdir -p www/lib/three www/lib/cannon
+          cp -r node_modules/three/build www/lib/three/
+          cp -r node_modules/three/examples www/lib/three/
+          cp -r node_modules/cannon-es/dist/. www/lib/cannon/
+          sed -i 's#https://cdn.jsdelivr.net/npm/three@0.160.0/#./lib/three/#g; s#https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/#./lib/cannon/#g' www/index.html
+          npx cap add android
+          npx cap sync android
+          perl -0pi -e 's/android:name="\.MainActivity"/android:name=".MainActivity" android:screenOrientation="landscape"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Build APK
+        run: |
+          cd build/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GoreFlip-APK
+          path: build/android/app/build/outputs/apk/debug/app-debug.apk
